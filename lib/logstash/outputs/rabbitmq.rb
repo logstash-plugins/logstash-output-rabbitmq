@@ -7,9 +7,9 @@ require "logstash/namespace"
 #
 # Relevant links:
 #
-# * RabbitMQ: <http://www.rabbitmq.com/>
-# * March Hare: <http://rubymarchhare.info>
-# * Bunny: <http://rubybunny.info>
+# * http://www.rabbitmq.com/[RabbitMQ]
+# * http://rubymarchhare.info[March Hare]
+# * http://rubybunny.info[Bunny]
 class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   EXCHANGE_TYPES = ["fanout", "direct", "topic"]
 
