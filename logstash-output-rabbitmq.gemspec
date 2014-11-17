@@ -23,6 +23,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'logstash', '>= 1.4.0', '< 2.0.0'
 
   if RUBY_PLATFORM == 'java'
+    s.platform = RUBY_PLATFORM
     s.add_runtime_dependency 'march_hare', ['~> 2.5.1'] #(MIT license)
   else
     s.add_runtime_dependency 'bunny', ['>= 1.6.0'] #(MIT license)
