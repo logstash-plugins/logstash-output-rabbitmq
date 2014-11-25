@@ -30,5 +30,7 @@ Gem::Specification.new do |s|
   end
 
   s.add_development_dependency 'logstash-devutils'
+  s.add_development_dependency 'logstash-input-generator'
+  s.add_development_dependency 'logstash-codec-json'
 end
 
