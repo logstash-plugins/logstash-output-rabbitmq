@@ -22,7 +22,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   #
 
   # RabbitMQ server address
-  config :host, :validate => :string, :required => true
+  config :host, :validate => :array, :required => true
 
   # RabbitMQ port to connect on
   config :port, :validate => :number, :default => 5672
@@ -42,7 +42,8 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Validate SSL certificate
   config :verify_ssl, :validate => :boolean, :default => false
 
-  # Enable or disable logging
+  # Enable or disable logging. Repurposed to apply changes for testing
+  # Hides certain error messages and makes initial host selection deterministic.
   config :debug, :validate => :boolean, :default => false, :deprecated => "Use the logstash --debug flag for this instead."
 
 
