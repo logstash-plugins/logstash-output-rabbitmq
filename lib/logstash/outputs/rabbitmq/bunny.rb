@@ -14,6 +14,9 @@ class LogStash::Outputs::RabbitMQ
 
       @logger.info("Registering output", :plugin => self)
 
+      @host.shuffle! if @shuffle_hosts
+      @host_idx = 0
+
       connect
       declare_exchange
     end # def register
@@ -56,7 +59,7 @@ class LogStash::Outputs::RabbitMQ
     end
 
     def to_s
-      return "amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
+      return "amqp://#{@user}@#{@current_host}:#{@current_port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
     end
 
     def teardown
@@ -78,10 +81,15 @@ class LogStash::Outputs::RabbitMQ
       @port        ||= AMQ::Protocol::DEFAULT_PORT
       @routing_key ||= "#"
 
+      @current_host, @current_port = @host[@host_idx].split(':')
+      @host_idx = @host_idx + 1 >= @host.length ? 0 : @host_idx + 1
+
+      @current_port = @port if not @current_port
+
       @settings = {
         :vhost => @vhost,
-        :host  => @host,
-        :port  => @port,
+        :host  => @current_host,
+        :port  => @current_port,
         :automatically_recover => false
       }
       @settings[:user]      = @user || Bunny::DEFAULT_USER
@@ -105,7 +113,7 @@ class LogStash::Outputs::RabbitMQ
                                else
                                  "amqps"
                                end
-      @connection_url        = "#{proto}://#{@user}@#{@host}:#{@port}#{vhost}/#{@queue}"
+      @connection_url        = "#{proto}://#{@user}@#{@current_host}:#{@current_port}#{vhost}/#{@queue}"
 
       begin
         @conn = Bunny.new(@settings)

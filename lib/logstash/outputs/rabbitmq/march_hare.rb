@@ -15,6 +15,9 @@ class LogStash::Outputs::RabbitMQ
 
       @connected = java.util.concurrent.atomic.AtomicBoolean.new
 
+      @host.shuffle! if @shuffle_hosts
+      @host_idx = 0
+
       connect
       @x = declare_exchange
 
@@ -59,7 +62,7 @@ class LogStash::Outputs::RabbitMQ
     end
 
     def to_s
-      return "amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
+      return "amqp://#{@user}@#{@current_host}:#{@current_port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
     end
 
     def teardown
@@ -83,10 +86,15 @@ class LogStash::Outputs::RabbitMQ
       # 5672. Will be switched to 5671 by Bunny if TLS is enabled.
       @port        ||= 5672
 
+      @current_host, @current_port = @host[@host_idx].split(':')
+      @host_idx = @host_idx + 1 >= @host.length ? 0 : @host_idx + 1
+
+      @current_port = @port if not @current_port
+
       @settings = {
         :vhost => @vhost,
-        :host  => @host,
-        :port  => @port,
+        :host  => @current_host,
+        :port  => @current_port,
         :user  => @user,
         :automatic_recovery => false
       }
@@ -102,7 +110,7 @@ class LogStash::Outputs::RabbitMQ
                                else
                                  "amqps"
                                end
-      @connection_url        = "#{proto}://#{@user}@#{@host}:#{@port}#{vhost}/#{@queue}"
+      @connection_url        = "#{proto}://#{@user}@#{@current_host}:#{@current_port}#{vhost}/#{@queue}"
 
       begin
         @conn = MarchHare.connect(@settings)

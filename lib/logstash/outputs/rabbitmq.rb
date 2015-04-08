@@ -21,7 +21,14 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   #
 
   # RabbitMQ server address
-  config :host, :validate => :string, :required => true
+  #  syntax allowed:
+  #   "127.0.0.1"
+  #   ["127.0.0.1", "127.0.0.2:5672"]
+  #
+  config :host, :validate => :array, :required => true
+
+  # RabbitMQ shuffle host before using
+  config :shuffle_hosts, :validate => :boolean, :default => true
 
   # RabbitMQ port to connect on
   config :port, :validate => :number, :default => 5672
