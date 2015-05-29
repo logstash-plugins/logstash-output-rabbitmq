@@ -53,7 +53,7 @@ class LogStash::Outputs::RabbitMQ
         sleep n
 
         connect
-        declare_exchange
+        @x = declare_exchange
         retry
       end
     end
@@ -105,7 +105,7 @@ class LogStash::Outputs::RabbitMQ
       @connection_url        = "#{proto}://#{@user}@#{@host}:#{@port}#{vhost}/#{@queue}"
 
       begin
-        @conn = MarchHare.connect(@settings)
+        @conn = MarchHare.connect(@settings) unless @conn && @conn.open?
 
         @logger.debug("Connecting to RabbitMQ. Settings: #{@settings.inspect}, queue: #{@queue.inspect}")
 
