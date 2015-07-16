@@ -4,128 +4,129 @@ require "logstash/pipeline"
 require "logstash/outputs/rabbitmq"
 
 describe LogStash::Outputs::RabbitMQ do
-
-  describe "rabbitmq static key" do
-    config <<-END
-      input {
-        generator {
-          count => 1
-        }
-      }
-      output {
-        rabbitmq {
-          host => "localhost"
-          exchange_type => "topic"
-          exchange => "foo"
-          key => "bar"
-        }
-      }
-    END
-
-    it "should use defined key" do
-      exchange = double("exchange")
-      expect_any_instance_of(LogStash::Outputs::RabbitMQ).to receive(:connect).and_return(nil)
-      expect_any_instance_of(LogStash::Outputs::RabbitMQ).to receive(:declare_exchange).and_return(exchange)
-
-      expect(exchange).to receive(:publish).with(an_instance_of(String), {:routing_key => "bar", :properties => {:persistent => true}})
-
-      # we need to set expectations before running the pipeline, this is why we cannot use the
-      # "agent" spec construct here so we do it manually
-      pipeline = LogStash::Pipeline.new(config)
-      pipeline.run
-    end
-
-  end
-
-  describe "rabbitmq key with dynamic field" do
-    config <<-END
-      input {
-        generator {
-          count => 1
-          add_field => ["foo", "bar"]
-        }
-      }
-      output {
-        rabbitmq {
-          host => "localhost"
-          exchange_type => "topic"
-          exchange => "foo"
-          key => "%{foo}"
-        }
-      }
-    END
-
-    it "should populate the key with the content of the event foo field" do
-      exchange = double("exchange")
-      expect_any_instance_of(LogStash::Outputs::RabbitMQ).to receive(:connect).and_return(nil)
-      expect_any_instance_of(LogStash::Outputs::RabbitMQ).to receive(:declare_exchange).and_return(exchange)
-
-      expect(exchange).to receive(:publish).with(an_instance_of(String), {:routing_key => "bar", :properties => {:persistent => true}})
-
-      # we need to set expectations before running the pipeline, this is why we cannot use the
-      # "agent" spec construct here so we do it manually
-      pipeline = LogStash::Pipeline.new(config)
-      pipeline.run
-    end
-
-  end
-
-  # TODO: Redo all this
-  # This is a crazy test to fix an urgent bug. It tests that we actually to change the
-  # store exchange value when an exception happens
-  # This should be a small number of lines, but until we refactor we must jump through hoops
-  # to put the plugin in the proper state and extract the proper state to test
-  describe "retrying a publish" do
-    let(:settings) {
-      {
-        "host" => "localhost",
-        "exchange_type" => "topic",
-        "exchange" => "foo",
-        "key" => "%{foo}"
-      }
+  let(:klass) { LogStash::Outputs::RabbitMQ }
+  let(:host) { "localhost" }
+  let(:port) { 5672 }
+  let(:exchange_type) { "topic" }
+  let(:exchange) { "myexchange" }
+  let(:key) { "mykey" }
+  let(:persistent) { true }
+  let(:settings) {
+    {
+      "host" => host,
+      "port" => port,
+      "exchange_type" => exchange_type,
+      "exchange" => exchange,
+      "key" => key,
+      "persistent" => persistent
     }
-    let(:event) { LogStash::Event.new("foo" => "bar")}
+  }
+  let(:instance) { klass.new(settings) }
+  let(:hare_info) { instance.instance_variable_get(:@hare_info) }
 
-    subject { LogStash::Outputs::RabbitMQ.new(settings) }
+  context "when connected" do
+    let(:connection) { double("MarchHare Connection") }
+    let(:channel) { double("Channel") }
+    let(:exchange) { double("Exchange") }
 
     before do
-      allow(subject).to receive(:connect) {
-                          subject.instance_variable_get(:@connected).set(true)
-                        }
+      allow(instance).to receive(:connect!).and_call_original
+      allow(::MarchHare).to receive(:connect).and_return(connection)
+      allow(connection).to receive(:create_channel).and_return(channel)
+      allow(channel).to receive(:exchange).and_return(exchange)
 
-      exchange_invocation = 0
-
-      @most_recent_exchange = nil
-
-      allow(subject).to receive(:declare_exchange) do
-        exchange_invocation += 1
-        @most_recent_exchange = double("exchange #{exchange_invocation}")
-      end
-
-      subject.register
+      instance.register
     end
 
-    context "when the connection aborts once" do
-      before do
-        i = 0
-        allow(subject).to receive(:attempt_publish_serialized) do
-          i+=1
-          if i == 1 # Raise an exception once
-           raise MarchHare::Exception, "First"
-          else
-            "nope"
-          end
+    describe "#register" do
+      subject { instance }
+
+      it "should create cleanly" do
+        expect(subject).to be_a(klass)
+      end
+
+      it "should connect" do
+        expect(subject).to have_received(:connect!).once
+      end
+    end
+
+    describe "#connect!" do
+      subject { hare_info }
+
+      it "should set @hare_info correctly" do
+        expect(subject).to be_a(LogStash::Outputs::RabbitMQ::HareInfo)
+      end
+
+      it "should set @connection correctly" do
+        expect(subject.connection).to eql(connection)
+      end
+
+      it "should set the channel correctly" do
+        expect(subject.channel).to eql(channel)
+      end
+
+      it "should set the exchange correctly" do
+        expect(subject.exchange).to eql(exchange)
+      end
+    end
+
+    shared_examples("sending the correct message") do
+
+    end
+
+    describe "#publish_encoded" do
+      let(:event) { LogStash::Event.new("foo" => "bar") }
+      let(:sprinted_key) { double("sprinted key") }
+      let(:encoded_event) { LogStash::Json.dump(event) }
+
+      describe "issuing the publish" do
+        before do
+          allow(exchange).to receive(:publish).with(any_args)
+          allow(event).to receive(:sprintf).with(key).and_return(sprinted_key)
+          instance.send(:publish, event, encoded_event)
         end
 
-        subject.publish_serialized(event, "hello")
+        it "should send the correct message" do
+          expect(exchange).to have_received(:publish).with(encoded_event, anything)
+        end
+
+        it "should send the correct metadata" do
+          expected_metadata = {:routing_key => sprinted_key, :properties => {:persistent => persistent }}
+
+          expect(exchange).to have_received(:publish).with(anything, expected_metadata)
+        end
       end
 
-      it "should re-declare the exchange" do
-        expect(subject).to have_received(:declare_exchange).twice
-      end
+      context "when a MarchHare::Exception is encountered" do
+        before do
+          i = 0
+          allow(instance).to receive(:connect!)
+          allow(instance).to receive(:sleep_for_retry)
+          allow(exchange).to receive(:publish).with(any_args) do
+            i += 1
+            raise(MarchHare::Exception, "foo") if i == 1
+          end
 
-      it "should set the exchange to the second double" do
-        expect(subject.instance_variable_get(:@x)).to eql(@most_recent_exchange)
+          instance.send(:publish, event, encoded_event)
+        end
+
+        it "should execute publish twice due to a retry" do
+          expect(exchange).to have_received(:publish).twice
+        end
+
+        it "should sleep for the retry" do
+          expect(instance).to have_received(:sleep_for_retry).once
+        end
+
+        it "should send the correct message (twice)" do
+          expect(exchange).to have_received(:publish).with(encoded_event, anything).twice
+        end
+
+        it "should send the correct metadata (twice)" do
+          expected_metadata = {:routing_key => event.sprintf(key), :properties => {:persistent => persistent }}
+
+          expect(exchange).to have_received(:publish).with(anything, expected_metadata).twice
+        end
       end
     end
   end

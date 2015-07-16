@@ -1,6 +1,8 @@
 # encoding: utf-8
 require "logstash/outputs/base"
 require "logstash/namespace"
+require "march_hare"
+require "java"
 
 # Push events to a RabbitMQ exchange. Requires RabbitMQ 2.x
 # or later version (3.x is recommended).
@@ -12,12 +14,9 @@ require "logstash/namespace"
 class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   EXCHANGE_TYPES = ["fanout", "direct", "topic"]
 
+  HareInfo = Struct.new(:connection, :channel, :exchange)
+
   config_name "rabbitmq"
-
-
-  #
-  # Connection
-  #
 
   # RabbitMQ server address
   config :host, :validate => :string, :required => true
@@ -43,12 +42,8 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Enable or disable logging
   config :debug, :validate => :boolean, :default => false, :deprecated => "Use the logstash --debug flag for this instead."
 
-
-
-  #
-  # Exchange
-  #
-
+  # Try to automatically recovery from broken connections. You almost certainly don't want to override this!!!
+  config :automatic_recovery, :validate => :boolean, :default => true
 
   # The exchange type (fanout, topic, direct)
   config :exchange_type, :validate => EXCHANGE_TYPES, :required => true
@@ -67,7 +62,8 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Should RabbitMQ persist messages to disk?
   config :persistent, :validate => :boolean, :default => true
 
-
+  # Time in seconds to wait before retrying a connection
+  config :connect_retry_interval, :validate => :number, :default => 1
 
   def initialize(params)
     params["codec"] = "json" if !params["codec"]
@@ -75,138 +71,101 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
     super
   end
 
-  #
-  # API
-  #
-
   def register
-    require "march_hare"
-    require "java"
-
-    @logger.info("Registering output", :plugin => self)
-
-    @connected = java.util.concurrent.atomic.AtomicBoolean.new
-
-    connect
-    @x = declare_exchange
-
-    @connected.set(true)
-
-    @codec.on_event(&method(:publish_serialized))
+    connect!
+    @codec.on_event(&method(:publish))
   end
-
 
   def receive(event)
     return unless output?(event)
 
-    begin
-      @codec.encode(event)
-    rescue => e
-      @logger.warn("Error encoding event", :exception => e, :event => event)
-    end
+    @codec.encode(event)
+  rescue StandardError => e
+    @logger.warn("Error encoding event", :exception => e, :event => event)
   end
 
-  def publish_serialized(event, message)
-    attempt_publish_serialized(event, message)
+  private
+  def publish(event, message)
+    @hare_info.exchange.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
   rescue MarchHare::Exception, IOError, com.rabbitmq.client.AlreadyClosedException => e
-    @connected.set(false)
-    n = 10
-
-    @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
-                  :exception => e,
-                  :backtrace => e.backtrace)
     return if terminating?
 
-    sleep n
+    @logger.error("Error while publishing. Will retry.",
+                  :message => e.message,
+                  :exception => e.class,
+                  :backtrace => e.backtrace)
 
-    connect
-    @x = declare_exchange
+    sleep_for_retry
+    connect!
     retry
   end
 
-  def attempt_publish_serialized(event, message)
-    if @connected.get
-      @x.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
-    else
-      @logger.warn("Tried to send a message, but not connected to RabbitMQ.")
-    end
-  end
-
   def to_s
-    return "amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
+    return "<LogStash::RabbitMQ::Output: amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}>"
   end
 
   def teardown
-    @connected.set(false)
-    @conn.close if @conn && @conn.open?
-    @conn = nil
+    @hare_info.connection.close if connection_open?
 
     finished
   end
 
+  private
+  def settings
+    return @settings if @settings
 
-
-  #
-  # Implementation
-  #
-
-  def connect
-    return if terminating?
-
-    @vhost       ||= "127.0.0.1"
-    # 5672. Will be switched to 5671 by Bunny if TLS is enabled.
-    @port        ||= 5672
-
-    @settings = {
+    s = {
       :vhost => @vhost,
       :host  => @host,
       :port  => @port,
       :user  => @user,
-      :automatic_recovery => false
+      :automatic_recovery => @automatic_recovery,
+      :pass => @password ? @password.value : "guest",
     }
-    @settings[:pass]      = if @password
-                              @password.value
-                            else
-                              "guest"
-                            end
-
-    @settings[:tls]        = @ssl if @ssl
-    proto                  = if @ssl
-                               "amqp"
-                             else
-                               "amqps"
-                             end
-    @connection_url        = "#{proto}://#{@user}@#{@host}:#{@port}#{vhost}/#{@queue}"
-
-    begin
-      @conn = MarchHare.connect(@settings) unless @conn && @conn.open?
-
-      @logger.debug("Connecting to RabbitMQ. Settings: #{@settings.inspect}, queue: #{@queue.inspect}")
-
-      @ch = @conn.create_channel
-      @logger.info("Connected to RabbitMQ at #{@settings[:host]}")
-    rescue MarchHare::Exception => e
-      @connected.set(false)
-      n = 10
-
-      @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
-                    :exception => e,
-                    :backtrace => e.backtrace)
-      return if terminating?
-
-      sleep n
-      retry
-    end
+    s[:tls] = @ssl if @ssl
+    @settings = s
   end
 
-  def declare_exchange
-    @logger.debug("Declaring an exchange", :name => @exchange, :type => @exchange_type,
-                  :durable => @durable)
-    x = @ch.exchange(@exchange, :type => @exchange_type.to_sym, :durable => @durable)
+  private
+  def connect
+    @logger.debug("Connecting to RabbitMQ. Settings: #{settings.inspect}, queue: #{@queue.inspect}")
 
-    # sets @connected to true during recovery. MK.
-    @connected.set(true)
 
-    x
+    connection = MarchHare.connect(settings)
+    channel = connection.create_channel
+    @logger.info("Connected to RabbitMQ at #{settings[:host]}")
+
+    @logger.debug("Declaring an exchange", :name => @exchange,
+                  :type => @exchange_type, :durable => @durable)
+
+    exchange = channel.exchange(@exchange, :type => @exchange_type.to_sym, :durable => @durable)
+    @logger.debug("Exchange declared")
+
+    HareInfo.new(connection, channel, exchange)
+  end
+
+  private
+  def connect!
+    @hare_info = connect() unless connection_open?
+  rescue MarchHare::Exception => e
+    return unless terminating?
+
+    @logger.error("RabbitMQ connection error, will retry.",
+                  :message => e.message,
+                  :exception => e.class.name,
+                  :backtrace => e.backtrace)
+
+    sleep_for_retry
+    retry
+  end
+
+  private
+  def connection_open?
+    @hare_info && @hare_info.connection && @hare_info.connection.open?
+  end
+
+  private
+  def sleep_for_retry
+    sleep @connect_retry_interval
   end
 end
