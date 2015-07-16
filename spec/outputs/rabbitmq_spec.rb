@@ -70,6 +70,11 @@ describe LogStash::Outputs::RabbitMQ do
 
   end
 
+  # TODO: Redo all this
+  # This is a crazy test to fix an urgent bug. It tests that we actually to change the
+  # store exchange value when an exception happens
+  # This should be a small number of lines, but until we refactor we must jump through hoops
+  # to put the plugin in the proper state and extract the proper state to test
   describe "retrying a publish" do
     let(:settings) {
       {
