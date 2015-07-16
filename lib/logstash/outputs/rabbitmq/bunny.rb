@@ -14,6 +14,12 @@ class LogStash::Outputs::RabbitMQ
 
       @logger.info("Registering output", :plugin => self)
 
+      if @debug || @host.length == 1
+        @cur_index = 0
+      else
+        @cur_index = rand(@host.length)
+      end
+
       connect
       declare_exchange
     end # def register
@@ -45,10 +51,10 @@ class LogStash::Outputs::RabbitMQ
 
         @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
                       :exception => e,
-                      :backtrace => e.backtrace)
+                      :backtrace => e.backtrace) if not @debug
         return if terminating?
 
-        sleep n
+        sleep n if @host.length == 1
         connect
         declare_exchange
         retry
@@ -56,7 +62,7 @@ class LogStash::Outputs::RabbitMQ
     end
 
     def to_s
-      return "amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
+      return "amqp://#{@user}@#{@host[0]}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}"
     end
 
     def teardown
@@ -73,15 +79,18 @@ class LogStash::Outputs::RabbitMQ
     #
 
     def connect
+      host, port = @host[@cur_index].split(":")
+      @cur_index = (@cur_index + 1) % @host.length
+
       @vhost       ||= Bunny::DEFAULT_HOST
       # 5672. Will be switched to 5671 by Bunny if TLS is enabled.
-      @port        ||= AMQ::Protocol::DEFAULT_PORT
+      port         ||= @port || AMQ::Protocol::DEFAULT_PORT
       @routing_key ||= "#"
 
       @settings = {
         :vhost => @vhost,
-        :host  => @host,
-        :port  => @port,
+        :host  => host,
+        :port  => port,
         :automatically_recover => false
       }
       @settings[:user]      = @user || Bunny::DEFAULT_USER
@@ -105,7 +114,7 @@ class LogStash::Outputs::RabbitMQ
                                else
                                  "amqps"
                                end
-      @connection_url        = "#{proto}://#{@user}@#{@host}:#{@port}#{vhost}/#{@queue}"
+      @connection_url        = "#{proto}://#{@user}@#{host}:#{port}#{vhost}/#{@queue}"
 
       begin
         @conn = Bunny.new(@settings)
@@ -121,11 +130,15 @@ class LogStash::Outputs::RabbitMQ
 
         @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
                       :exception => e,
-                      :backtrace => e.backtrace)
+                      :backtrace => e.backtrace) if not @debug
         return if terminating?
 
-        sleep n
-        retry
+        if @host.length == 1
+          sleep n
+          retry
+        else
+          connect # Try another server
+        end
       end
     end
 
