@@ -35,26 +35,28 @@ class LogStash::Outputs::RabbitMQ
     end
 
     def publish_serialized(event, message)
-      begin
-        if @connected.get
-          @x.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
-        else
-          @logger.warn("Tried to send a message, but not connected to RabbitMQ.")
-        end
-      rescue MarchHare::Exception, IOError, com.rabbitmq.client.AlreadyClosedException => e
-        @connected.set(false)
-        n = 10
+      attempt_publish_serialized(event, message)
+    rescue MarchHare::Exception, IOError, com.rabbitmq.client.AlreadyClosedException => e
+      @connected.set(false)
+      n = 10
 
-        @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
-                      :exception => e,
-                      :backtrace => e.backtrace)
-        return if terminating?
+      @logger.error("RabbitMQ connection error: #{e.message}. Will attempt to reconnect in #{n} seconds...",
+                    :exception => e,
+                    :backtrace => e.backtrace)
+      return if terminating?
 
-        sleep n
+      sleep n
 
-        connect
-        @x = declare_exchange
-        retry
+      connect
+      @x = declare_exchange
+      retry
+    end
+
+    def attempt_publish_serialized(event, message)
+      if @connected.get
+        @x.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
+      else
+        @logger.warn("Tried to send a message, but not connected to RabbitMQ.")
       end
     end
 
