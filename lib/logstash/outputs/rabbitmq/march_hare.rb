@@ -14,6 +14,7 @@ class LogStash::Outputs::RabbitMQ
       @logger.info("Registering output", :plugin => self)
 
       @connected = java.util.concurrent.atomic.AtomicBoolean.new
+      @initialized = java.util.concurrent.atomic.AtomicBoolean.new
 
       connect
       @x = declare_exchange
@@ -80,7 +81,15 @@ class LogStash::Outputs::RabbitMQ
 
     def connect
       return if terminating?
-
+      
+      while @conn && !@conn.open? do 
+        @logger.warn("Waiting for connection")
+        sleep 10
+      end
+      
+      return if @initialized.get
+      return if not @initialized.compareAndSet(false, true)
+ 
       @vhost       ||= "127.0.0.1"
       # 5672. Will be switched to 5671 by Bunny if TLS is enabled.
       @port        ||= 5672
@@ -90,7 +99,7 @@ class LogStash::Outputs::RabbitMQ
         :host  => @host,
         :port  => @port,
         :user  => @user,
-        :automatic_recovery => false
+        :automatic_recovery => @reconnect
       }
       @settings[:pass]      = if @password
                                 @password.value

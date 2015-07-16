@@ -41,6 +41,9 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Validate SSL certificate
   config :verify_ssl, :validate => :boolean, :default => false
 
+  # Enable or disable reconnect
+  config :reconnect, :validate => :boolean, :default => true
+
   # Enable or disable logging
   config :debug, :validate => :boolean, :default => false, :deprecated => "Use the logstash --debug flag for this instead."
 
