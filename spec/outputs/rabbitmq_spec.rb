@@ -69,4 +69,59 @@ describe LogStash::Outputs::RabbitMQ do
     end
 
   end
+
+  describe "retrying a publish" do
+    let(:settings) {
+      {
+        "host" => "localhost",
+        "exchange_type" => "topic",
+        "exchange" => "foo",
+        "key" => "%{foo}"
+      }
+    }
+    let(:event) { LogStash::Event.new("foo" => "bar")}
+
+    subject { LogStash::Outputs::RabbitMQ.new(settings) }
+
+    before do
+      allow(subject).to receive(:connect) {
+                          subject.instance_variable_get(:@connected).set(true)
+                        }
+
+      exchange_invocation = 0
+
+      @most_recent_exchange = nil
+
+      allow(subject).to receive(:declare_exchange) do
+        exchange_invocation += 1
+        @most_recent_exchange = double("exchange #{exchange_invocation}")
+      end
+
+      subject.register
+    end
+
+    context "when the connection aborts once" do
+      before do
+        i = 0
+        allow(subject).to receive(:attempt_publish_serialized) do
+          i+=1
+          if i == 1 # Raise an exception once
+           raise MarchHare::Exception, "First"
+          else
+            "nope"
+          end
+        end
+
+        subject.publish_serialized(event, "hello")
+      end
+
+      it "should re-declare the exchange" do
+        expect(subject).to have_received(:declare_exchange).twice
+      end
+
+      it "should set the exchange to the second double" do
+        expect(subject.instance_variable_get(:@x)).to eql(@most_recent_exchange)
+      end
+    end
+  end
 end
