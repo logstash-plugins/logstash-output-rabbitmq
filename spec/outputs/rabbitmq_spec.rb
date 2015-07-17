@@ -70,10 +70,6 @@ describe LogStash::Outputs::RabbitMQ do
       end
     end
 
-    shared_examples("sending the correct message") do
-
-    end
-
     describe "#publish_encoded" do
       let(:event) { LogStash::Event.new("foo" => "bar") }
       let(:sprinted_key) { double("sprinted key") }
