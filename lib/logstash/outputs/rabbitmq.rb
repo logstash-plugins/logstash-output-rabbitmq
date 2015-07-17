@@ -71,11 +71,13 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
     super
   end
 
+  public
   def register
     connect!
     @codec.on_event(&method(:publish))
   end
 
+  public
   def receive(event)
     return unless output?(event)
 
@@ -100,10 +102,12 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
     retry
   end
 
+  public
   def to_s
     return "<LogStash::RabbitMQ::Output: amqp://#{@user}@#{@host}:#{@port}#{@vhost}/#{@exchange_type}/#{@exchange}\##{@key}>"
   end
 
+  public
   def teardown
     @hare_info.connection.close if connection_open?
 
@@ -148,7 +152,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   def connect!
     @hare_info = connect() unless connection_open?
   rescue MarchHare::Exception => e
-    return unless terminating?
+    return if terminating?
 
     @logger.error("RabbitMQ connection error, will retry.",
                   :message => e.message,

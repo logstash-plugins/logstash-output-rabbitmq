@@ -130,4 +130,36 @@ describe LogStash::Outputs::RabbitMQ do
       end
     end
   end
+
+  # If the connection encounters an exception during its initial
+  # connection attempt we must handle that. Subsequent errors should be
+  # handled by the automatic retry mechanism built-in to MarchHare
+  describe "initial connection exceptions" do
+    subject { instance }
+
+    before do
+      allow(subject).to receive(:sleep_for_retry)
+
+
+      i = 0
+      allow(subject).to receive(:connect) do
+        i += 1
+        if i == 1
+          raise(MarchHare::ConnectionRefused, "Error!")
+        else
+          double("connection")
+        end
+      end
+
+      subject.send(:connect!)
+    end
+
+    it "should retry its connection when conn fails" do
+      expect(subject).to have_received(:connect).twice
+    end
+
+    it "should sleep between retries" do
+      expect(subject).to have_received(:sleep_for_retry).once
+    end
+  end
 end
