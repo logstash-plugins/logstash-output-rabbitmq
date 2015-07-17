@@ -33,6 +33,8 @@ describe LogStash::Outputs::RabbitMQ do
       allow(instance).to receive(:connect!).and_call_original
       allow(::MarchHare).to receive(:connect).and_return(connection)
       allow(connection).to receive(:create_channel).and_return(channel)
+      allow(connection).to receive(:on_blocked)
+      allow(connection).to receive(:on_unblocked)
       allow(channel).to receive(:exchange).and_return(exchange)
 
       instance.register

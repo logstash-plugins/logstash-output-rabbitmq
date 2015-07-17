@@ -136,6 +136,9 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
 
 
     connection = MarchHare.connect(settings)
+    connection.on_blocked { @logger.warn("RabbitMQ output blocked! Check your RabbitMQ instance!") }
+    connection.on_unblocked { @logger.warn("RabbitMQ output unblocked!") }
+
     channel = connection.create_channel
     @logger.info("Connected to RabbitMQ at #{settings[:host]}")
 
