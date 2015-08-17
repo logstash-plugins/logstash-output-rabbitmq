@@ -152,7 +152,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
     @logger.debug("Declaring an exchange", :name => @exchange,
                   :type => @exchange_type, :durable => @durable)
     exchange = channel.exchange(@exchange, :type => @exchange_type.to_sym, :durable => @durable)
-    @logger.debug("Exchange declared", )
+    @logger.debug("Exchange declared")
     exchange
   rescue StandardError => e
     @logger.error("Could not declare exchange!",
