@@ -142,13 +142,24 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
     channel = connection.create_channel
     @logger.info("Connected to RabbitMQ at #{settings[:host]}")
 
-    @logger.debug("Declaring an exchange", :name => @exchange,
-                  :type => @exchange_type, :durable => @durable)
-
-    exchange = channel.exchange(@exchange, :type => @exchange_type.to_sym, :durable => @durable)
-    @logger.debug("Exchange declared")
+    exchange = declare_exchange!(channel)
 
     HareInfo.new(connection, channel, exchange)
+  end
+
+  private
+  def declare_exchange!(channel)
+    @logger.debug("Declaring an exchange", :name => @exchange,
+                  :type => @exchange_type, :durable => @durable)
+    exchange = channel.exchange(@exchange, :type => @exchange_type.to_sym, :durable => @durable)
+    @logger.debug("Exchange declared", )
+    exchange
+  rescue StandardError => e
+    @logger.error("Could not declare exchange!",
+                  :exchange => @exchange, :type => @exchange_type,
+                  :durable => @durable, :error_class => e.class.name,
+                  :error_message => e.message, :backtrace => e.backtrace)
+    raise e
   end
 
   private
