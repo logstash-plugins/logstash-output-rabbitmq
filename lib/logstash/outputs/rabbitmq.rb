@@ -42,7 +42,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Enable or disable logging
   config :debug, :validate => :boolean, :default => false, :deprecated => "Use the logstash --debug flag for this instead."
 
-  # Try to automatically recover from a broken connections. You almost certainly don't want to override this!!!
+  # Set this to automatically recover from a broken connection. You almost certainly don't want to override this!!!
   config :automatic_recovery, :validate => :boolean, :default => true
 
   # The exchange type (fanout, topic, direct)
