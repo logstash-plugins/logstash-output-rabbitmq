@@ -42,7 +42,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Enable or disable logging
   config :debug, :validate => :boolean, :default => false, :deprecated => "Use the logstash --debug flag for this instead."
 
-  # Try to automatically recovery from broken connections. You almost certainly don't want to override this!!!
+  # Try to automatically recover from a broken connections. You almost certainly don't want to override this!!!
   config :automatic_recovery, :validate => :boolean, :default => true
 
   # The exchange type (fanout, topic, direct)
@@ -98,7 +98,6 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
                   :backtrace => e.backtrace)
 
     sleep_for_retry
-    connect!
     retry
   end
 
@@ -164,7 +163,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
 
   private
   def connect!
-    @hare_info = connect() unless connection_open?
+    @hare_info = connect() unless @hare_info
   rescue MarchHare::Exception => e
     return if terminating?
 
