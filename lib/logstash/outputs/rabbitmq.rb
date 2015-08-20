@@ -163,7 +163,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
 
   private
   def connect!
-    @hare_info = connect() unless @hare_info
+    @hare_info = connect()
   rescue MarchHare::Exception => e
     return if terminating?
 
