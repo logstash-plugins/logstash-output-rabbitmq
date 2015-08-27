@@ -45,6 +45,9 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
   # Set this to automatically recover from a broken connection. You almost certainly don't want to override this!!!
   config :automatic_recovery, :validate => :boolean, :default => true
 
+  # The default connection timeout; zero means wait indefinitely
+  config :connection_timeout, :validate => :number, :required => false
+
   # The exchange type (fanout, topic, direct)
   config :exchange_type, :validate => EXCHANGE_TYPES, :required => true
 
@@ -125,6 +128,7 @@ class LogStash::Outputs::RabbitMQ < LogStash::Outputs::Base
       :automatic_recovery => @automatic_recovery,
       :pass => @password ? @password.value : "guest",
     }
+    s[:timeout] = @connection_timeout || MarchHare::ConnectionFactory::DEFAULT_CONNECTION_TIMEOUT
     s[:tls] = @ssl if @ssl
     @settings = s
   end
