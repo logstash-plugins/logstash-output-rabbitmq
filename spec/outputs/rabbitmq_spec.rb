@@ -1,5 +1,5 @@
+# encoding: UTF-8
 require "logstash/devutils/rspec/spec_helper"
-
 require "logstash/pipeline"
 require "logstash/outputs/rabbitmq"
 
@@ -11,7 +11,7 @@ describe LogStash::Outputs::RabbitMQ do
   let(:exchange) { "myexchange" }
   let(:key) { "mykey" }
   let(:persistent) { true }
-  let(:settings) {
+  let(:rabbitmq_settings) {
     {
       "host" => host,
       "port" => port,
@@ -21,7 +21,7 @@ describe LogStash::Outputs::RabbitMQ do
       "persistent" => persistent
     }
   }
-  let(:instance) { klass.new(settings) }
+  let(:instance) { klass.new(rabbitmq_settings) }
   let(:hare_info) { instance.instance_variable_get(:@hare_info) }
 
   context "when connected" do
@@ -40,32 +40,8 @@ describe LogStash::Outputs::RabbitMQ do
       instance.register
     end
 
-    describe "#register" do
-      subject { instance }
-
-      it "should create cleanly" do
-        expect(subject).to be_a(klass)
-      end
-
-      it "should connect" do
-        expect(subject).to have_received(:connect!).once
-      end
-    end
-
     describe "#connect!" do
       subject { hare_info }
-
-      it "should set @hare_info correctly" do
-        expect(subject).to be_a(LogStash::Outputs::RabbitMQ::HareInfo)
-      end
-
-      it "should set @connection correctly" do
-        expect(subject.connection).to eql(connection)
-      end
-
-      it "should set the channel correctly" do
-        expect(subject.channel).to eql(channel)
-      end
 
       it "should set the exchange correctly" do
         expect(subject.exchange).to eql(exchange)
@@ -128,36 +104,86 @@ describe LogStash::Outputs::RabbitMQ do
       end
     end
   end
-
-  # If the connection encounters an exception during its initial
-  # connection attempt we must handle that. Subsequent errors should be
-  # handled by the automatic retry mechanism built-in to MarchHare
-  describe "initial connection exceptions" do
-    subject { instance }
-
-    before do
-      allow(subject).to receive(:sleep_for_retry)
+end
 
 
-      i = 0
-      allow(subject).to receive(:connect) do
-        i += 1
-        if i == 1
-          raise(MarchHare::ConnectionRefused, "Error!")
-        else
-          double("connection")
-        end
+describe "with a live server", :integration => true do
+  let(:klass) { LogStash::Outputs::RabbitMQ }
+  let(:exchange) { "myexchange" }
+  let(:exchange_type) { "topic" }
+  let(:default_plugin_config) {
+    {
+      "host" => "127.0.0.1",
+      "exchange" => exchange,
+      "exchange_type" => exchange_type,
+      "key" => "foo"
+    }
+  }
+  let(:config) { default_plugin_config }
+  let(:instance) { klass.new(config) }
+  let(:hare_info) { instance.instance_variable_get(:@hare_info) }
+
+  # Spawn a connection in the bg and wait up (n) seconds
+  def spawn_and_wait(instance)
+    instance.register
+
+    20.times do
+      instance.connected? ? break : sleep(0.1)
+    end
+
+    # Extra time to make sure the output can attach
+    sleep 1
+  end
+
+  let(:test_connection) { MarchHare.connect(instance.send(:rabbitmq_settings)) }
+  let(:test_channel) { test_connection.create_channel }
+  let(:test_queue) {
+    test_channel.queue("testq", :auto_delete => true).bind(exchange, :key => config["key"])
+  }
+
+  before do
+    # Materialize the instance in the current thread to prevent dupes
+    # If you use multiple threads with lazy evaluation weird stuff happens
+    instance
+    spawn_and_wait(instance)
+
+    test_channel # Start up the test client as well
+    test_queue
+  end
+
+  after do
+    instance.close()
+    test_channel.close
+    test_connection.close
+  end
+
+  context "using defaults" do
+    it "should start, connect, and stop cleanly" do
+      expect(instance.connected?).to be_truthy
+    end
+
+    it "should close cleanly" do
+      instance.close
+      expect(instance.connected?).to be_falsey
+    end
+  end
+
+  describe "sending a message with an exchange specified" do
+    let(:message) { LogStash::Event.new(:message => "Foo Message") }
+
+    it "should process the message" do
+      @received = nil
+      test_queue.subscribe do |metadata,payload|
+        @received = payload
       end
 
-      subject.send(:connect!)
-    end
+      instance.receive(message)
 
-    it "should retry its connection when conn fails" do
-      expect(subject).to have_received(:connect).twice
-    end
+      until @received
+        sleep 1
+      end
 
-    it "should sleep between retries" do
-      expect(subject).to have_received(:sleep_for_retry).once
+      expect(@received).to eql(message.to_s)
     end
   end
 end
