@@ -38,7 +38,7 @@ module LogStash
       end
 
       def receive(event)
-        return unless output?(event)
+        
 
         @codec.encode(event)
       rescue StandardError => e
