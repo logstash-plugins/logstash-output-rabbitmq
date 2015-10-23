@@ -14,6 +14,8 @@ module LogStash
     class RabbitMQ < LogStash::Outputs::Base
       include LogStash::PluginMixins::RabbitMQConnection
 
+      config_name("rabbitmq")
+
       # Key to route to by default. Defaults to 'logstash'
       #
       # * Routing keys are ignored on fanout exchanges.
