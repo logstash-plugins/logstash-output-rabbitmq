@@ -1,3 +1,6 @@
+## 3.0.5
+ - Fix broken registration of plugin
+
 ## 3.0.3
  - Bump dependency on logstash-mixin-rabbitmq_connection
 

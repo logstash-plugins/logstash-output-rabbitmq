@@ -24,6 +24,10 @@ describe LogStash::Outputs::RabbitMQ do
   let(:instance) { klass.new(rabbitmq_settings) }
   let(:hare_info) { instance.instance_variable_get(:@hare_info) }
 
+  it "should register as an output plugin" do
+    expect(LogStash::Plugin.lookup("output", "rabbitmq")).to eql(LogStash::Outputs::RabbitMQ)
+  end
+
   context "when connected" do
     let(:connection) { double("MarchHare Connection") }
     let(:channel) { double("Channel") }
