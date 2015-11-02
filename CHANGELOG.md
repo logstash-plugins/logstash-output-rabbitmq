@@ -1,3 +1,6 @@
+## 3.1.0
+ - Support prefetch_count parameter via upgrade of rabbitmq_connection dependency
+
 ## 3.0.5
  - Fix broken registration of plugin
 
