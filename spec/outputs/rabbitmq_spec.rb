@@ -40,6 +40,7 @@ describe LogStash::Outputs::RabbitMQ do
       allow(connection).to receive(:on_blocked)
       allow(connection).to receive(:on_unblocked)
       allow(channel).to receive(:exchange).and_return(exchange)
+      allow(channel).to receive(:prefetch=)
 
       instance.register
     end
