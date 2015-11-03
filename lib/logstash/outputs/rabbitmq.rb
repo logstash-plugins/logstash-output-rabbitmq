@@ -4,10 +4,7 @@ require "logstash/plugin_mixins/rabbitmq_connection"
 
 # Push events to a RabbitMQ exchange. Requires RabbitMQ 2.x
 # or later version (3.x is recommended).
-#
-# By default this will use the JSON codec to encode messages.
-# You can override this by specifying an alternate 'codec' value
-#
+# 
 # Relevant links:
 #
 # * http://www.rabbitmq.com/[RabbitMQ]
@@ -18,7 +15,8 @@ module LogStash
       include LogStash::PluginMixins::RabbitMQConnection
 
       config_name "rabbitmq"
-      
+
+      # The default codec for this plugin is JSON. You can override this to suit your particular needs however.
       default :codec, "json"
 
       # Key to route to by default. Defaults to 'logstash'
