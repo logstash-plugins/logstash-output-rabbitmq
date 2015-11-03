@@ -5,6 +5,9 @@ require "logstash/plugin_mixins/rabbitmq_connection"
 # Push events to a RabbitMQ exchange. Requires RabbitMQ 2.x
 # or later version (3.x is recommended).
 #
+# By default this will use the JSON codec to encode messages.
+# You can override this by specifying an alternate 'codec' value
+#
 # Relevant links:
 #
 # * http://www.rabbitmq.com/[RabbitMQ]
@@ -33,15 +36,19 @@ module LogStash
       # Should RabbitMQ persist messages to disk?
       config :persistent, :validate => :boolean, :default => true
 
+      def initialize(params)
+        params["codec"] = "json" if !params["codec"]
+        super
+      end
+
       def register
         connect!
         @hare_info.exchange = declare_exchange!(@hare_info.channel, @exchange, @exchange_type, @durable)
         @codec.on_event(&method(:publish))
       end
 
-      def receive(event)
-        
 
+      def receive(event)
         @codec.encode(event)
       rescue StandardError => e
         @logger.warn("Error encoding event", :exception => e, :event => event)
