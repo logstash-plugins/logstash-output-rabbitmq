@@ -18,6 +18,8 @@ module LogStash
       include LogStash::PluginMixins::RabbitMQConnection
 
       config_name "rabbitmq"
+      
+      default :codec, "json"
 
       # Key to route to by default. Defaults to 'logstash'
       #
@@ -35,11 +37,6 @@ module LogStash
 
       # Should RabbitMQ persist messages to disk?
       config :persistent, :validate => :boolean, :default => true
-
-      def initialize(params)
-        params["codec"] = "json" if !params["codec"]
-        super
-      end
 
       def register
         connect!
