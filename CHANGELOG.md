@@ -1,3 +1,6 @@
+## 3.0.6
+ - Set codec to JSON if none specified to recreate old behavior
+
 ## 3.0.5
  - Fix broken registration of plugin
 

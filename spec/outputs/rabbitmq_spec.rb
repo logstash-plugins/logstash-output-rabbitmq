@@ -173,9 +173,9 @@ describe "with a live server", :integration => true do
   end
 
   describe "sending a message with an exchange specified" do
-    let(:message) { LogStash::Event.new(:message => "Foo Message") }
+    let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah") }
 
-    it "should process the message" do
+    before do
       @received = nil
       test_queue.subscribe do |metadata,payload|
         @received = payload
@@ -187,7 +187,11 @@ describe "with a live server", :integration => true do
         sleep 1
       end
 
-      expect(@received).to eql(message.to_s)
+      @decoded = LogStash::Json.load(@received)
+    end
+
+    it "should process the message fully using the default (JSON) codec" do
+      expect(@decoded).to eql(LogStash::Json.load(LogStash::Json.dump(message)))
     end
   end
 end

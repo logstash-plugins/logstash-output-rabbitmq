@@ -4,7 +4,7 @@ require "logstash/plugin_mixins/rabbitmq_connection"
 
 # Push events to a RabbitMQ exchange. Requires RabbitMQ 2.x
 # or later version (3.x is recommended).
-#
+# 
 # Relevant links:
 #
 # * http://www.rabbitmq.com/[RabbitMQ]
@@ -15,6 +15,9 @@ module LogStash
       include LogStash::PluginMixins::RabbitMQConnection
 
       config_name "rabbitmq"
+
+      # The default codec for this plugin is JSON. You can override this to suit your particular needs however.
+      default :codec, "json"
 
       # Key to route to by default. Defaults to 'logstash'
       #
@@ -39,9 +42,8 @@ module LogStash
         @codec.on_event(&method(:publish))
       end
 
-      def receive(event)
-        
 
+      def receive(event)
         @codec.encode(event)
       rescue StandardError => e
         @logger.warn("Error encoding event", :exception => e, :event => event)
