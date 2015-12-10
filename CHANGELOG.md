@@ -1,3 +1,6 @@
+## 3.0.7
+  - Bump rabbitmq_connection version to use newer march hare gem and fix perms issues
+
 ## 3.0.6
  - Set codec to JSON if none specified to recreate old behavior
 
