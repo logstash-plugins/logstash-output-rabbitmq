@@ -1,3 +1,5 @@
+# 3.0.8
+  - New dependency requirements for logstash-core for the 5.0 release
 ## 3.0.7
   - Bump rabbitmq_connection version to use newer march hare gem and fix perms issues
 
