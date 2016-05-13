@@ -1,3 +1,6 @@
+## 4.0.2
+  - Depend on latest RMQ connection with TLS improvements
+
 ## 4.0.1
   - Republish all the gems under jruby.
 ## 4.0.0
