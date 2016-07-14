@@ -1,3 +1,6 @@
+## 4.0.3
+  - Relax constraint on logstash-core-plugin-api to >= 1.60 <= 2.99
+
 ## 4.0.2
   - Depend on latest RMQ connection with TLS improvements
 
