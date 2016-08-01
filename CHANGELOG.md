@@ -1,4 +1,4 @@
-## 4.0.3
+## 4.0.4
   - Depend on latest RMQ connection which retries on connection exception
 
 ## 4.0.3
