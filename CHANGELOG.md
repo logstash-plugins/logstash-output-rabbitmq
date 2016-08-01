@@ -1,4 +1,7 @@
 ## 4.0.3
+  - Depend on latest RMQ connection which retries on connection exception
+
+## 4.0.3
   - Relax constraint on logstash-core-plugin-api to >= 1.60 <= 2.99
 
 ## 4.0.2
