@@ -1,3 +1,5 @@
+# 3.1.1
+  - Depend on latest RMQ connection which retries on connection exception
 # 3.1.0
   - Depend on latest RMQ connection with TLS improvements
 # 3.0.9
