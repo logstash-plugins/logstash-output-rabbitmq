@@ -36,9 +36,12 @@ module LogStash
       # Should RabbitMQ persist messages to disk?
       config :persistent, :validate => :boolean, :default => true
 
+      # Additional arguments for the exchange, for example could be the presence of an alternate exchange, ...
+      config :arguments, :validate => :array, :default => {}
+
       def register
         connect!
-        @hare_info.exchange = declare_exchange!(@hare_info.channel, @exchange, @exchange_type, @durable)
+        @hare_info.exchange = declare_exchange!(@hare_info.channel, @exchange, @exchange_type, @durable, @arguments)
         @codec.on_event(&method(:publish))
       end
 
