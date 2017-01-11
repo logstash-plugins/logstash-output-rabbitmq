@@ -39,6 +39,7 @@ describe LogStash::Outputs::RabbitMQ do
       allow(connection).to receive(:create_channel).and_return(channel)
       allow(connection).to receive(:on_blocked)
       allow(connection).to receive(:on_unblocked)
+      allow(connection).to receive(:on_shutdown)
       allow(channel).to receive(:exchange).and_return(exchange)
 
       instance.register

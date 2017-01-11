@@ -1,3 +1,6 @@
+##
+  - Fix broken tests due to latest logstash-output-rabbitmq_connection
+
 ## 4.0.4
   - Depend on latest RMQ connection which retries on connection exception
 
