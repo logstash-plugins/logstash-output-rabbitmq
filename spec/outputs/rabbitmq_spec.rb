@@ -28,6 +28,10 @@ describe LogStash::Outputs::RabbitMQ do
     expect(LogStash::Plugin.lookup("output", "rabbitmq")).to eql(LogStash::Outputs::RabbitMQ)
   end
 
+  it "should default @batching_enabled to false" do
+    expect( instance.instance_variable_get(:@batching_enabled)).to be_falsey
+  end
+
   context "when connected" do
     let(:connection) { double("MarchHare Connection") }
     let(:channel) { double("Channel") }
@@ -52,6 +56,7 @@ describe LogStash::Outputs::RabbitMQ do
         expect(subject.exchange).to eql(exchange)
       end
     end
+
 
     describe "#publish_encoded" do
       let(:event) { LogStash::Event.new("foo" => "bar") }
@@ -108,6 +113,123 @@ describe LogStash::Outputs::RabbitMQ do
         end
       end
     end
+  end
+
+  context "batching not enabled, flush and do_close on the codec should not be called" do
+    let(:event) { LogStash::Event.new("foo" => "bar") }
+    let(:codec) { double("Codec") }
+
+    before do
+      instance.instance_variable_set(:@codec, codec)
+      allow(codec).to receive(:encode)
+      allow(codec).to receive(:flush)
+      allow(codec).to receive(:do_close)
+    end
+
+    describe "#receive" do
+
+      before do
+        instance.receive( event)
+      end
+
+      it "should have called the codec to encode the data" do
+        expect(codec).to have_received(:encode)
+      end
+
+      it "should not have called flush" do
+        expect(codec).to have_received(:flush).exactly(0).times
+      end
+    end
+
+    describe "#close" do
+      before do
+        instance.close()
+      end
+
+      it "should not have called the do_close on the codec" do
+        expect(codec).to have_received(:do_close).exactly(0).times
+      end
+    end
+
+    describe "#multi_receive" do
+     let(:events) {
+       [ LogStash::Event.new("foo" => "bar"),
+         LogStash::Event.new("foo1" => "bar2")
+       ]
+      }
+      before do
+        instance.multi_receive( events)
+      end
+
+      it "should have called the codec to encode the data for each event" do
+        expect(codec).to have_received(:encode).exactly(2).times
+      end
+      it "should have not have called flush" do
+        expect(codec).to have_received(:flush).exactly(0).times
+      end
+    end
+  end
+
+  context "batching enabled, flush and do_close should be called on the codec" do
+    let(:event) { LogStash::Event.new("foo" => "bar") }
+    let(:codec) { double("Codec") }
+
+    before do
+      instance.instance_variable_set(:@codec, codec)
+      instance.instance_variable_set(:@batching_enabled, true)
+      allow(codec).to receive(:encode)
+      allow(codec).to receive(:flush)
+      allow(codec).to receive(:do_close)
+    end
+
+    describe "#receive" do
+
+      before do
+        instance.receive( event)
+      end
+
+      it "should have called the codec to encode the data" do
+        expect(codec).to have_received(:encode)
+      end
+
+      it "should not have called flush" do
+        expect(codec).to have_received(:flush).exactly(0).times
+      end
+    end
+
+    describe "#close" do
+      before do
+        instance.close()
+      end
+
+      it "should have called the do_close on the codec" do
+        expect(codec).to have_received(:do_close).exactly(1).times
+      end
+    end
+
+    describe "#multi_receive" do
+      let(:batch01) {
+        [ LogStash::Event.new("foo0" => "bar0"),
+          LogStash::Event.new("foo1" => "bar1")
+        ]
+       }
+      let(:batch02) {
+        [ LogStash::Event.new("foo2" => "bar2"),
+          LogStash::Event.new("foo3" => "bar3")
+        ]
+       }
+       before do
+         instance.multi_receive( batch01)
+         instance.multi_receive( batch02)
+       end
+
+       it "should have called the codec to encode the data for each event" do
+         expect(codec).to have_received(:encode).exactly(4).times
+       end
+       it "should have called flush after each batch" do
+         expect(codec).to have_received(:flush).exactly(2).times
+       end
+     end
   end
 end
 

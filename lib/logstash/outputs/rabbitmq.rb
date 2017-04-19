@@ -36,10 +36,24 @@ module LogStash
       # Should RabbitMQ persist messages to disk?
       config :persistent, :validate => :boolean, :default => true
 
+      # Does the codec support batching
+      # If enabled calls flush and do_close on the codec
+      config :batching, :validate => :boolean, :default => false
+
+
       def register
         connect!
         @hare_info.exchange = declare_exchange!(@hare_info.channel, @exchange, @exchange_type, @durable)
         @codec.on_event(&method(:publish))
+        @batching_enabled = batching
+      end
+
+
+      def multi_receive(events)
+        events.each {|event| receive(event) }
+        if @batching_enabled && @codec.respond_to?( :flush)
+          @codec.flush
+        end
       end
 
 
@@ -63,6 +77,7 @@ module LogStash
       end
 
       def close
+        @codec.do_close if @batching_enabled && @codec.respond_to?( :do_close)
         close_connection
       end
     end
