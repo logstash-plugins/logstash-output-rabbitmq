@@ -1,6 +1,8 @@
 # encoding: UTF-8
 require "logstash/pipeline"
 require "logstash/plugin_mixins/rabbitmq_connection"
+java_import java.util.concurrent.TimeoutException
+java_import com.rabbitmq.client.AlreadyClosedException
 
 # Push events to a RabbitMQ exchange. Requires RabbitMQ 2.x
 # or later version (3.x is recommended).
@@ -52,7 +54,7 @@ module LogStash
       def publish(event, message)
         raise ArgumentError, "No exchange set in HareInfo!!!" unless @hare_info.exchange
         @hare_info.exchange.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
-      rescue MarchHare::Exception, IOError, com.rabbitmq.client.AlreadyClosedException => e
+      rescue MarchHare::Exception, IOError, AlreadyClosedException, TimeoutException => e
         @logger.error("Error while publishing. Will retry.",
                       :message => e.message,
                       :exception => e.class,
