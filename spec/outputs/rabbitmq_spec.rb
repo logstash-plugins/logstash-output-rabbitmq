@@ -2,6 +2,7 @@
 require "logstash/devutils/rspec/spec_helper"
 require "logstash/pipeline"
 require "logstash/outputs/rabbitmq"
+java_import java.util.concurrent.TimeoutException
 
 describe LogStash::Outputs::RabbitMQ do
   let(:klass) { LogStash::Outputs::RabbitMQ }
@@ -23,6 +24,25 @@ describe LogStash::Outputs::RabbitMQ do
   }
   let(:instance) { klass.new(rabbitmq_settings) }
   let(:hare_info) { instance.instance_variable_get(:@hare_info) }
+
+  shared_examples 'recovers from exception gracefully' do
+    it 'should execute publish twice due to a retry' do
+      expect(exchange).to have_received(:publish).twice
+    end
+
+    it 'should sleep for the retry' do
+      expect(instance).to have_received(:sleep_for_retry).once
+    end
+
+    it 'should send the correct message (twice)' do
+      expect(exchange).to have_received(:publish).with(encoded_event, anything).twice
+    end
+
+    it 'should send the correct metadata (twice)' do
+      expected_metadata = {:routing_key => event.sprintf(key), :properties => {:persistent => persistent }}
+      expect(exchange).to have_received(:publish).with(anything, expected_metadata).twice
+    end
+  end
 
   it "should register as an output plugin" do
     expect(LogStash::Plugin.lookup("output", "rabbitmq")).to eql(LogStash::Outputs::RabbitMQ)
@@ -76,35 +96,34 @@ describe LogStash::Outputs::RabbitMQ do
         end
       end
 
-      context "when a MarchHare::Exception is encountered" do
+      context 'when an exception is encountered' do
+        let(:exception) { nil }
+
         before do
           i = 0
           allow(instance).to receive(:connect!)
           allow(instance).to receive(:sleep_for_retry)
           allow(exchange).to receive(:publish).with(any_args) do
             i += 1
-            raise(MarchHare::Exception, "foo") if i == 1
+            raise exception if i == 1
           end
 
           instance.send(:publish, event, encoded_event)
         end
 
-        it "should execute publish twice due to a retry" do
-          expect(exchange).to have_received(:publish).twice
+        context 'when it is a MarchHare exception' do
+          let(:exception) { MarchHare::Exception }
+          it_behaves_like 'recovers from exception gracefully'
         end
 
-        it "should sleep for the retry" do
-          expect(instance).to have_received(:sleep_for_retry).once
+        context 'when it is a MarchHare::ChannelAlreadyClosed' do
+          let(:exception) { MarchHare::ChannelAlreadyClosed }
+          it_behaves_like 'recovers from exception gracefully'
         end
 
-        it "should send the correct message (twice)" do
-          expect(exchange).to have_received(:publish).with(encoded_event, anything).twice
-        end
-
-        it "should send the correct metadata (twice)" do
-          expected_metadata = {:routing_key => event.sprintf(key), :properties => {:persistent => persistent }}
-
-          expect(exchange).to have_received(:publish).with(anything, expected_metadata).twice
+        context 'when it is a TimeoutException' do
+          let(:exception) { TimeoutException.new }
+          it_behaves_like 'recovers from exception gracefully'
         end
       end
     end
