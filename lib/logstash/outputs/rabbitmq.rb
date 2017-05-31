@@ -34,7 +34,10 @@ module LogStash
       config :durable, :validate => :boolean, :default => true
 
       # Should RabbitMQ persist messages to disk?
-      config :persistent, :validate => :boolean, :default => true
+      config :persistent, :validate => :boolean, :default => true, :obsolete => "Use properties instead"
+
+      # Send additional message properties
+      config :properties, :validate => :hash, :default => {}
 
       def register
         connect!
@@ -51,7 +54,7 @@ module LogStash
 
       def publish(event, message)
         raise ArgumentError, "No exchange set in HareInfo!!!" unless @hare_info.exchange
-        @hare_info.exchange.publish(message, :routing_key => event.sprintf(@key), :properties => { :persistent => @persistent })
+        @hare_info.exchange.publish(message, :routing_key => event.sprintf(@key), :properties => parse_hash(event, @properties))
       rescue MarchHare::Exception, IOError, com.rabbitmq.client.AlreadyClosedException => e
         @logger.error("Error while publishing. Will retry.",
                       :message => e.message,
@@ -60,6 +63,14 @@ module LogStash
 
         sleep_for_retry
         retry
+      end
+
+      def parse_hash(event, hash)
+        Hash[hash.map{|name,value| [name.to_sym, parse_value(event, value)]}]
+      end
+
+      def parse_value(event, value)
+        if value.class == Hash then parse_hash(event, value) else event.sprintf(value) end
       end
 
       def close
