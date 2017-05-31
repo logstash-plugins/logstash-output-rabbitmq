@@ -11,6 +11,7 @@ describe LogStash::Outputs::RabbitMQ do
   let(:exchange) { "myexchange" }
   let(:key) { "mykey" }
   let(:persistent) { true }
+  let(:properties) { { :correlation_id => "correlation-1", :headers => { :key => "test_value"} } }
   let(:rabbitmq_settings) {
     {
       "host" => host,
@@ -18,7 +19,8 @@ describe LogStash::Outputs::RabbitMQ do
       "exchange_type" => exchange_type,
       "exchange" => exchange,
       "key" => key,
-      "persistent" => persistent
+      "persistent" => persistent,
+      "properties" => properties
     }
   }
   let(:instance) { klass.new(rabbitmq_settings) }
@@ -70,7 +72,7 @@ describe LogStash::Outputs::RabbitMQ do
         end
 
         it "should send the correct metadata" do
-          expected_metadata = {:routing_key => sprinted_key, :properties => {:persistent => persistent }}
+          expected_metadata = {:routing_key => sprinted_key, :properties => properties }
 
           expect(exchange).to have_received(:publish).with(anything, expected_metadata)
         end
