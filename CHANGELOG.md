@@ -1,3 +1,6 @@
+## 4.0.9
+  -  Support per-message properties
+
 ## 4.0.7
   -  Require v4.3.0 of rabbitmq-connection_mixin which bumps the major version of the java rabbitmq lib
 

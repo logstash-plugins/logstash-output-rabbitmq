@@ -135,12 +135,16 @@ describe "with a live server", :integration => true do
   let(:klass) { LogStash::Outputs::RabbitMQ }
   let(:exchange) { "myexchange" }
   let(:exchange_type) { "topic" }
+  let(:priority) { 34 }
   let(:default_plugin_config) {
     {
       "host" => "127.0.0.1",
       "exchange" => exchange,
       "exchange_type" => exchange_type,
-      "key" => "foo"
+      "key" => "foo",
+      "message_properties" => {
+          "priority" => priority
+      }
     }
   }
   let(:config) { default_plugin_config }
@@ -158,7 +162,7 @@ describe "with a live server", :integration => true do
     # Extra time to make sure the output can attach
     sleep 1
   end
-
+  let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah") }
   let(:test_connection) { MarchHare.connect(instance.send(:rabbitmq_settings)) }
   let(:test_channel) { test_connection.create_channel }
   let(:test_queue) {
@@ -189,6 +193,14 @@ describe "with a live server", :integration => true do
     it "should close cleanly" do
       instance.close
       expect(instance.connected?).to be_falsey
+    end
+
+    it 'applies per message settings' do
+      instance.receive(message)
+      sleep 1.0
+
+      message, payload = test_queue.pop
+      expect(message.properties.to_s).to include("priority=#{priority}")
     end
   end
 
