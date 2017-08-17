@@ -1,3 +1,6 @@
+## 4.0.10
+  - Doc fixes
+
 ## 4.0.9
   -  Support per-message properties
 
