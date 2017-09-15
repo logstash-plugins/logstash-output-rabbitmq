@@ -1,3 +1,6 @@
+## 5.0.2
+  - Docs: Fix broken link
+
 ## 5.0.1
   - Fix some documentation issues
 
