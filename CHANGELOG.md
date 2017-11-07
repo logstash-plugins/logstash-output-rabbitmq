@@ -1,3 +1,6 @@
+## 5.0.3
+  - Update gemspec summary
+
 ## 5.0.2
   - Docs: Fix broken link
 
