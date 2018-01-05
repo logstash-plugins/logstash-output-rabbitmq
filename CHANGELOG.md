@@ -1,3 +1,6 @@
+## 5.1.0
+  _ Use shared concurrency / multiple channels for performance
+
 ## 5.0.3
   - Update gemspec summary
 

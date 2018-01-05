@@ -17,6 +17,8 @@ module LogStash
       include LogStash::PluginMixins::RabbitMQConnection
 
       config_name "rabbitmq"
+      
+      concurrency :shared
 
       # The default codec for this plugin is JSON. You can override this to suit your particular needs however.
       default :codec, "json"
@@ -44,22 +46,24 @@ module LogStash
       def register
         connect!
         @hare_info.exchange = declare_exchange!(@hare_info.channel, @exchange, @exchange_type, @durable)
-        @codec.on_event(&method(:publish))
+        # The connection close should close all channels, so it is safe to store thread locals here without closing them
+        @thread_local_channel = java.lang.ThreadLocal.new
+        @thread_local_exchange = java.lang.ThreadLocal.new
       end
 
       def symbolize(myhash)
         Hash[myhash.map{|(k,v)| [k.to_sym,v]}]
       end
 
-      def receive(event)
-        @codec.encode(event)
-      rescue StandardError => e
-        @logger.warn("Error encoding event", :exception => e, :event => event)
+      def multi_receive_encoded(events_and_data)
+        events_and_data.each do |event, data|
+          publish(event, data)
+        end
       end
 
       def publish(event, message)
         raise ArgumentError, "No exchange set in HareInfo!!!" unless @hare_info.exchange
-        @hare_info.exchange.publish(message, :routing_key => event.sprintf(@key), :properties => symbolize(@message_properties.merge(:persistent => @persistent)))
+        local_exchange.publish(message, :routing_key => event.sprintf(@key), :properties => symbolize(@message_properties.merge(:persistent => @persistent)))
       rescue MarchHare::Exception, IOError, AlreadyClosedException, TimeoutException => e
         @logger.error("Error while publishing. Will retry.",
                       :message => e.message,
@@ -68,6 +72,24 @@ module LogStash
 
         sleep_for_retry
         retry
+      end
+
+      def local_exchange
+        exchange = @thread_local_exchange.get
+        if !exchange
+          exchange = declare_exchange!(local_channel, @exchange, @exchange_type, @durable)
+          @thread_local_exchange.set(exchange)
+        end
+        exchange
+      end
+
+      def local_channel
+        channel = @thread_local_channel.get
+        if !channel
+          channel = @hare_info.connection.create_channel
+          @thread_local_channel.set(channel)
+        end
+        channel
       end
 
       def close

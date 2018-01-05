@@ -163,6 +163,7 @@ describe "with a live server", :integration => true do
     sleep 1
   end
   let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah") }
+  let(:encoded) { message.to_json }
   let(:test_connection) { MarchHare.connect(instance.send(:rabbitmq_settings)) }
   let(:test_channel) { test_connection.create_channel }
   let(:test_queue) {
@@ -196,7 +197,7 @@ describe "with a live server", :integration => true do
     end
 
     it 'applies per message settings' do
-      instance.receive(message)
+      instance.multi_receive_encoded([[message, encoded]])
       sleep 1.0
 
       message, payload = test_queue.pop
@@ -213,7 +214,7 @@ describe "with a live server", :integration => true do
         @received = payload
       end
 
-      instance.receive(message)
+      instance.multi_receive_encoded([[message, encoded]])
 
       until @received
         sleep 1
