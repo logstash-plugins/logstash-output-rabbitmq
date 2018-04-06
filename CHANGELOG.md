@@ -1,3 +1,6 @@
+## 5.1.1
+  - Docs: Set the default_codec doc attribute.
+
 ## 5.1.0
   _ Use shared concurrency / multiple channels for performance
 
