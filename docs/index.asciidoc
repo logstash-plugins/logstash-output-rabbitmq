@@ -168,11 +168,14 @@ Key to route to by default. Defaults to 'logstash'
   * Value type is <<hash,hash>>
   * Default value is `{}`
 
-Add properties to be set per-message here, such as 'Content-Type', 'Priority'
+Add properties to be set per-message here, such as 'content_type', 'priority'
 
 Example:
 [source,ruby]
-    message_properties => { "priority" => "1" }
+    message_properties => {
+      "content_type" => "application/json"  
+      "priority" => 1
+    }
 
 
 [id="plugins-{type}s-{plugin}-passive"]
