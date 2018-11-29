@@ -12,7 +12,11 @@ describe LogStash::Outputs::RabbitMQ do
   let(:exchange) { "myexchange" }
   let(:key) { "mykey" }
   let(:persistent) { true }
-  let(:eventType) { "MessageType" }
+  let(:event_type) { "MessageType" }
+  let(:var_event_type) { "%{[@metadata][event_type]}" }
+  let(:event_metadata) {
+    {"event_type" => event_type }
+  }
   let(:rabbitmq_settings) {
     {
       "host" => host,
@@ -20,9 +24,9 @@ describe LogStash::Outputs::RabbitMQ do
       "exchange_type" => exchange_type,
       "exchange" => exchange,
       "key" => key,
-      "persistent" => persistent
+      "persistent" => persistent,
       "message_properties" => {
-        "type" => "%{[@metadata][eventType]}"
+        "type" => var_event_type
       }
     }
   }
@@ -43,7 +47,7 @@ describe LogStash::Outputs::RabbitMQ do
     end
 
     it 'should send the correct metadata (twice)' do
-      expected_metadata = {:routing_key => event.sprintf(key), :properties => {:persistent => persistent, :type => eventType }}
+      expected_metadata = {:routing_key => event.sprintf(key), :properties => {:persistent => persistent, :type => event_type }}
       expect(exchange).to have_received(:publish).with(anything, expected_metadata).twice
     end
   end
@@ -78,7 +82,7 @@ describe LogStash::Outputs::RabbitMQ do
     end
 
     describe "#publish_encoded" do
-      let(:event) { LogStash::Event.new("foo" => "bar", "@metadata" => {"eventType" => eventType }) }
+      let(:event) { LogStash::Event.new("foo" => "bar", "@metadata" => {"event_type" => event_type }) }
       let(:sprinted_key) { double("sprinted key") }
       let(:encoded_event) { LogStash::Json.dump(event) }
 
@@ -86,6 +90,7 @@ describe LogStash::Outputs::RabbitMQ do
         before do
           allow(exchange).to receive(:publish).with(any_args)
           allow(event).to receive(:sprintf).with(key).and_return(sprinted_key)
+          allow(event).to receive(:sprintf).with(var_event_type).and_return(event_type)
           instance.send(:publish, event, encoded_event)
         end
 
@@ -94,7 +99,7 @@ describe LogStash::Outputs::RabbitMQ do
         end
 
         it "should send the correct metadata" do
-          expected_metadata = {:routing_key => sprinted_key, :properties => {:persistent => persistent, :type => eventType }}
+          expected_metadata = {:routing_key => sprinted_key, :properties => {:persistent => persistent, :type => event_type }}
 
           expect(exchange).to have_received(:publish).with(anything, expected_metadata)
         end
@@ -166,7 +171,7 @@ describe "with a live server", :integration => true do
     # Extra time to make sure the output can attach
     sleep 1
   end
-  let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah", "@metadata" => {"eventType" => eventType }) }
+  let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah", "@metadata" => event_metadata) }
   let(:encoded) { message.to_json }
   let(:test_connection) { MarchHare.connect(instance.send(:rabbitmq_settings)) }
   let(:test_channel) { test_connection.create_channel }
@@ -210,7 +215,7 @@ describe "with a live server", :integration => true do
   end
 
   describe "sending a message with an exchange specified" do
-    let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah", "@metadata" => {"eventType" => eventType }) }
+    let(:message) { LogStash::Event.new("message" => "Foo Message", "extra_field" => "Blah", "@metadata" => event_metadata) }
 
     before do
       @received = nil
