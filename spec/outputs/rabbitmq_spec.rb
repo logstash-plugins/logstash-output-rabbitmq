@@ -145,6 +145,11 @@ describe "with a live server", :integration => true do
   let(:exchange) { "myexchange" }
   let(:exchange_type) { "topic" }
   let(:priority) { 34 }
+  let(:event_type) { "MessageType" }
+  let(:var_event_type) { "%{[@metadata][event_type]}" }
+  let(:event_metadata) {
+    {"event_type" => event_type }
+  }
   let(:default_plugin_config) {
     {
       "host" => "127.0.0.1",
@@ -153,6 +158,7 @@ describe "with a live server", :integration => true do
       "key" => "foo",
       "message_properties" => {
           "priority" => priority
+          "type" => var_event_type
       }
     }
   }
@@ -211,6 +217,7 @@ describe "with a live server", :integration => true do
 
       message, payload = test_queue.pop
       expect(message.properties.to_s).to include("priority=#{priority}")
+      expect(message.properties.to_s).to include("type=#{event_type}")
     end
   end
 
