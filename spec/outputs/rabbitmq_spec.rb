@@ -157,7 +157,7 @@ describe "with a live server", :integration => true do
       "exchange_type" => exchange_type,
       "key" => "foo",
       "message_properties" => {
-          "priority" => priority
+          "priority" => priority,
           "type" => var_event_type
       }
     }
