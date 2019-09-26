@@ -143,9 +143,9 @@ Common functionality for the rabbitmq input/output
 RabbitMQ server address(es)
 host can either be a single host, or a list of hosts
 i.e.
-  host => "localhost"
+  host => "localhost:port"
 or
-  host => ["host01", "host02]
+  host => ["host01:port", "host02:port"]
 
 if multiple hosts are provided on the initial connection and any subsequent
 recovery attempts of the hosts is chosen at random and connected to.
