@@ -2,6 +2,16 @@
 :type: output
 :default_codec: json
 
+/////////////////////////////////////////////
+// RabbitMQ Output Plugin Source Has Moved  //
+// ---------------------------------------- //
+// The RabbitMQ Output Plugin is now a part //
+// of the RabbitMQ Integration.             //
+//                                          //
+// This stand-alone plugin project remains  //
+// open for backports to the 5.x series.    //
+//////////////////////////////////////////////
+
 ///////////////////////////////////////////
 START - GENERATED VARIABLES, DO NOT EDIT!
 ///////////////////////////////////////////
