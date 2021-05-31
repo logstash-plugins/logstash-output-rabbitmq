@@ -63,6 +63,9 @@ module LogStash
 
       def publish(event, message)
         raise ArgumentError, "No exchange set in HareInfo!!!" unless @hare_info.exchange
+	if @passive
+		local_channel.queue(event.sprintf(@key))
+	end
         local_exchange.publish(message, :routing_key => event.sprintf(@key), :properties => symbolize(@message_properties.merge(:persistent => @persistent)))
       rescue MarchHare::Exception, IOError, AlreadyClosedException, TimeoutException => e
         @logger.error("Error while publishing. Will retry.",
