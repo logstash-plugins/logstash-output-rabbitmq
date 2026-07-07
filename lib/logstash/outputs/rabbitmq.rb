@@ -51,8 +51,9 @@ module LogStash
         @thread_local_exchange = java.lang.ThreadLocal.new
       end
 
-      def symbolize(myhash)
-        Hash[myhash.map{|(k,v)| [k.to_sym,v]}]
+      def symbolize(myhash, event)
+        Hash[myhash.map{|(k,v)| [k.to_sym, if v.is_a? String then event.sprintf(v) 
+          elsif v.is_a? Hash then symbolize(v, event) else v end]}]
       end
 
       def multi_receive_encoded(events_and_data)
@@ -63,7 +64,9 @@ module LogStash
 
       def publish(event, message)
         raise ArgumentError, "No exchange set in HareInfo!!!" unless @hare_info.exchange
-        local_exchange.publish(message, :routing_key => event.sprintf(@key), :properties => symbolize(@message_properties.merge(:persistent => @persistent)))
+        local_exchange.publish(message, :routing_key => event.sprintf(@key), :properties => symbolize(@message_properties.merge(
+          :persistent => @persistent
+          ), event))
       rescue MarchHare::Exception, IOError, AlreadyClosedException, TimeoutException => e
         @logger.error("Error while publishing. Will retry.",
                       :message => e.message,
