@@ -155,7 +155,7 @@ host can either be a single host, or a list of hosts
 i.e.
   host => "localhost"
 or
-  host => ["host01", "host02]
+  host => ["host01", "host02"]
 
 if multiple hosts are provided on the initial connection and any subsequent
 recovery attempts of the hosts is chosen at random and connected to.
